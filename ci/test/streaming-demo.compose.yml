@@ -10,7 +10,7 @@
 version: '3'
 services:
   billing-demo:
-    image: materialize/ci-billing-demo:${BUILDKITE_BUILD_NUMBER}
+    image: materialize/ci-billing-demo:${MATERIALIZED_IMAGE_ID}
     entrypoint: /bin/bash
     volumes:
       - db-data:/share/billing-demo/data
@@ -22,7 +22,7 @@ services:
     user: $BUILDKITE_AGENT_UID:$BUILDKITE_AGENT_GID
     depends_on: [kafka, zookeeper, materialized]
   materialized:
-    image: materialize/ci-materialized:${BUILDKITE_BUILD_NUMBER}
+    image: materialize/ci-materialized:${MATERIALIZED_IMAGE_ID}
     volumes:
       - db-data:/share/billing-demo/data
     command: --logging-granularity=10ms

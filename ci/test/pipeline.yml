@@ -135,6 +135,20 @@ steps:
       env:
         SQLLOGICTEST_IMAGE_ID: $BUILDKITE_BUILD_NUMBER
 
+  - id: chaos
+    label: ":monkey_face: Chaos Tests"
+    depends_on: [testdrive, streaming-demo]
+    trigger: chaos
+    async: true
+    #branches: "master v*.*"
+    build:
+      commit: "$BUILDKITE_COMMIT"
+      branch: "$BUILDKITE_BRANCH"
+      env:
+        MATERIALIZED_IMAGE_ID: $BUILDKITE_BUILD_NUMBER
+        BUILDKITE_AGENT_UID: $BUILDKITE_AGENT_UID
+        BUILDKITE_AGENT_GID: $BUILDKITE_AGENT_GID
+
   - id: deploy
     label: ":rocket: Deploy"
     depends_on: [lint-fast, lint-slow, cargo-test, testdrive, streaming-demo, metabase-demo, short-sqllogictest]
