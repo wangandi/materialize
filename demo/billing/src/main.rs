@@ -40,6 +40,76 @@ mod mz_client;
 mod proto;
 mod randomizer;
 
+const JSON_TEMPLATE : &str = "{
+    \"IsEmpty\": false,
+    \"Priority\": 5,
+    \"BookId\": 134324324,
+    \"SecurityId\": 4382342,
+    \"CCY\": \"RMB\",
+    \"Exposure\": 
+    {
+      \"CCY\": \"RMB\",
+      \"Current\":
+      {
+        \"Long\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        },
+        \"Short\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        }
+      },
+      \"Target\":
+      {
+        \"Long\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        },
+        \"Short\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        }
+      }
+    },
+    \"FxExposure\":
+    {
+      \"CCY\": \"RMB\",
+      \"Current\":
+      {
+        \"Long\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        },
+        \"Short\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        }
+      },
+      \"Target\":
+      {
+        \"Long\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        },
+        \"Short\": {
+          \"Shares\":123213.2349101924,
+          \"Exposure\": 2343.23432
+        }
+      }
+    },
+    \"EvalPrice\":
+    {
+      \"Amount\": 1343.234241341,
+      \"CCY\": \"RMB\"
+    },
+    \"UsdEvalPrice\":
+    {
+      \"Amount\": 2341.1241241,
+      \"CCY\": \"USD\"
+    }
+  }";
+
 #[tokio::main]
 async fn main() {
     if let Err(e) = run().await {
@@ -94,8 +164,7 @@ async fn create_kafka_messages(config: KafkaConfig) -> Result<()> {
     use rand::SeedableRng;
     let rng = rand::rngs::StdRng::from_seed(rand::random());
 
-    let val_a: Vec<u8> = "a".repeat(500).into_bytes();
-    let val_b: Vec<u8> = "b".repeat(500).into_bytes();
+    let val_a: Vec<u8> = String::from(JSON_TEMPLATE).into_bytes();
 
     let k_client = Arc::new(kafka_client::KafkaClient::new(
         &config.url,
@@ -110,11 +179,19 @@ async fn create_kafka_messages(config: KafkaConfig) -> Result<()> {
     loop {
         log::info!("producing 8k records");
         let backoff = tokio::time::delay_for(Duration::from_secs(1));
-        for i in 0..8000 {
-            let key: i32 = if i % 3 != 0 {
-                rand::thread_rng().gen_range(0, 10000)
-            } else {
-                rand::thread_rng().gen_range(0, 10000000)
+        for _i in 0..8000 {
+            let d = rand::thread_rng().gen_range(0, 1002247);
+            let key: i32 = match d {
+                d if d < 996560 => d,
+                d if d < 1000140 => 996560 + (d - 996560)/2,
+                d if d < 1001025 => 1000140 + (d - 1000140)/3,
+                d if d < 1001461 => 1001025 + (d - 1001025)/4,
+                d if d < 1001736 => 1001461 + (d - 1001461)/5,
+                d if d < 1002048 => 1001736 + (d - 1001736)/6,
+                d if d < 1002160 => 1002048 + (d - 1002048)/7,
+                d if d < 1002208 => 1002160 + (d - 1002160)/8,
+                d if d < 1002217 => 1002208 + (d - 1002208)/9,
+                _ => 1002217 + (d - 1002217)/10
             };
             let res = k_client.send(key.to_string().as_bytes(), val_a.as_slice());
             match res {
