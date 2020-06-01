@@ -180,19 +180,7 @@ async fn create_kafka_messages(config: KafkaConfig) -> Result<()> {
         log::info!("producing 8k records");
         let backoff = tokio::time::delay_for(Duration::from_secs(1));
         for _i in 0..8000 {
-            let d = rand::thread_rng().gen_range(0, 1002247);
-            let key: i32 = match d {
-                d if d < 996560 => d,
-                d if d < 1000140 => 996560 + (d - 996560)/2,
-                d if d < 1001025 => 1000140 + (d - 1000140)/3,
-                d if d < 1001461 => 1001025 + (d - 1001025)/4,
-                d if d < 1001736 => 1001461 + (d - 1001461)/5,
-                d if d < 1002048 => 1001736 + (d - 1001736)/6,
-                d if d < 1002160 => 1002048 + (d - 1002048)/7,
-                d if d < 1002208 => 1002160 + (d - 1002160)/8,
-                d if d < 1002217 => 1002208 + (d - 1002208)/9,
-                _ => 1002217 + (d - 1002217)/10
-            };
+            let key: i32 = rand::thread_rng().gen_range(0, 30000000);
             let res = k_client.send(key.to_string().as_bytes(), val_a.as_slice());
             match res {
                 Ok(fut) => {

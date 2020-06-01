@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use structopt::StructOpt;
 
-pub static KAFKA_SOURCE_NAME: &str = "upsert_text_source";
+pub static KAFKA_SOURCE_NAME: &str = "positions_source";
 pub static CSV_SOURCE_NAME: &str = "price_source";
 pub static KAFKA_SINK_NAME: &str = "billing_sink";
 pub static KAFKA_SINK_TOPIC_NAME: &str = "billing_monthly_statements";
