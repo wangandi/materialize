@@ -138,24 +138,25 @@ async fn run() -> Result<()> {
 
     let k_config = config.kafka_config();
     let mz_config = config.mz_config();
-    let mz_client = MzClient::new(&mz_config.host, mz_config.port).await?;
+    //let mz_client = MzClient::new(&mz_config.host, mz_config.port).await?;
     let check_sink = mz_config.check_sink;
 
     let k = tokio::spawn(async move { create_kafka_messages(k_config).await });
 
-    let mz = tokio::spawn(async move { create_materialized_source(mz_config).await });
-    let (k_res, mz_res) = futures::join!(k, mz);
+    //let mz = tokio::spawn(async move { create_materialized_source(mz_config).await });
+    //let (k_res, mz_res) = futures::join!(k, mz);
+    let (k_res, ) = futures::join!(k);
     k_res??;
-    mz_res??;
+    //mz_res??;
 
     if check_sink {
-        mz_client
+        /*(mz_client
             .validate_sink(
                 "check_sink",
                 "billing_monthly_statement",
                 "invalid_sink_rows",
             )
-            .await?;
+            .await?;*/
     }
     Ok(())
 }
