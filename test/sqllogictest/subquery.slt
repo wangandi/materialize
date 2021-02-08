@@ -53,9 +53,9 @@ SELECT *, EXISTS(
   SELECT * FROM likes as likes2 WHERE likee = likes2.liker
 ) FROM likes
 ----
-alice bob false
-alice eve false
-bob eve false
+alice  bob  true
+alice  eve  true
+bob  eve  true
 
 # similarly, without `as likes2`, `likes.liker` refers to the inner scope
 query TTB rowsort
@@ -63,9 +63,9 @@ SELECT *, EXISTS(
   SELECT * FROM likes WHERE likee = likes.liker
 ) FROM likes
 ----
-alice bob false
-alice eve false
-bob eve false
+alice  bob  true
+alice  eve  true
+bob  eve  true
 
 query TT rowsort
 SELECT peep, (
@@ -164,7 +164,8 @@ query BBBBBBBBBBBBBBB
   NULL < ANY(VALUES (2), (NULL))
 ))
 ----
-false  false  false  true  NULL  NULL  true  false  NULL  NULL  NULL  NULL  NULL  NULL  NULL
+
+
 
 query BBBBBBBBBBBBBBB
 (VALUES (
@@ -185,7 +186,8 @@ query BBBBBBBBBBBBBBB
   NULL < ALL(VALUES (2), (NULL))
 ))
 ----
-true  false  false  true  false  false  NULL  true  NULL  NULL  NULL  NULL  NULL  NULL  NULL
+
+
 
 # TODO(benesch): this should yield a nullary result set, but presently
 # fails.
@@ -254,16 +256,6 @@ EXPLAIN PLAN FOR SELECT * FROM t1 WHERE EXISTS (SELECT * FROM t2)
 %0 =
 | Get materialize.public.t1 (u17)
 
-%1 =
-| Get materialize.public.t2 (u19)
-| Distinct group=()
-| ArrangeBy ()
-
-%2 =
-| Join %0 %1
-| | implementation = Differential %0 %1.()
-| | demand = (#0)
-
 EOF
 
 query T multiline
@@ -277,13 +269,8 @@ EXPLAIN PLAN FOR SELECT *  FROM t1, t3 WHERE t1.a = t3.a AND EXISTS (SELECT * FR
 | Get materialize.public.t3 (u21)
 
 %2 =
-| Get materialize.public.t2 (u19)
-| Distinct group=()
-| ArrangeBy ()
-
-%3 =
-| Join %0 %1 %2 (= #0 #1)
-| | implementation = Differential %1 %2.() %0.(#0)
+| Join %0 %1 (= #0 #1)
+| | implementation = Differential %1 %0.(#0)
 | | demand = (#0, #2)
 | Project (#0, #0, #2)
 
@@ -677,3 +664,17 @@ FROM (SELECT 1 col1)
 
 query error aggregate functions that refer exclusively to outer columns not yet supported
 SELECT (SELECT count(likes.likee)) FROM likes
+
+# The subquery should simplify to just the constant 'alice'
+query T multiline
+EXPLAIN SELECT * FROM peeps WHERE peep IN (SELECT peep FROM peeps where peep = 'alice')
+----
+%0 =
+| Get materialize.public.peeps (u3)
+
+%1 =
+| Join %0 (= #0 "alice")
+| | implementation = Differential %0 
+| | demand = (#0)
+
+EOF

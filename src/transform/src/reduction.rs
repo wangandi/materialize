@@ -50,83 +50,97 @@ impl FoldConstants {
                 monotonic: _,
                 expected_group_size: _,
             } => {
-                for aggregate in aggregates.iter_mut() {
-                    aggregate.expr.reduce(&input.typ());
-                }
-                if let MirRelationExpr::Constant { rows, .. } = &**input {
-                    // Build a map from `group_key` to `Vec<Vec<an, ..., a1>>)`,
-                    // where `an` is the input to the nth aggregate function in
-                    // `aggregates`.
-                    let mut groups = BTreeMap::new();
-                    let temp_storage2 = RowArena::new();
-                    let mut row_packer = repr::RowPacker::new();
-                    for (row, diff) in rows {
-                        // We currently maintain the invariant that any negative
-                        // multiplicities will be consolidated away before they
-                        // arrive at a reduce.
-                        assert!(
-                            *diff > 0,
-                            "constant folding encountered reduce on collection \
-                             with non-positive multiplicities"
-                        );
-                        let datums = row.unpack();
-                        let temp_storage = RowArena::new();
-                        let key = group_key
-                            .iter()
-                            .map(|e| e.eval(&datums, &temp_storage2))
-                            .collect::<Result<Vec<_>, _>>()?;
-                        let val = aggregates
-                            .iter()
-                            .map(|agg| {
-                                Ok::<_, TransformError>(
-                                    row_packer.pack(&[agg.expr.eval(&datums, &temp_storage)?]),
-                                )
-                            })
-                            .collect::<Result<Vec<_>, _>>()?;
-                        let entry = groups.entry(key).or_insert_with(Vec::new);
-                        for _ in 0..*diff {
-                            entry.push(val.clone());
-                        }
-                    }
-
-                    // For each group, apply the aggregate function to the rows
-                    // in the group. The output is
-                    // `Vec<Vec<k1, ..., kn, r1, ..., rn>>`
-                    // where kn is the nth column of the key and rn is the
-                    // result of the nth aggregate function for that group.
-                    let new_rows = groups
-                        .into_iter()
-                        .map({
-                            let mut row_packer = repr::RowPacker::new();
-                            move |(key, vals)| {
-                                let temp_storage = RowArena::new();
-                                let row = row_packer.pack(key.into_iter().chain(
-                                    aggregates.iter().enumerate().map(|(i, agg)| {
-                                        if agg.distinct {
-                                            agg.func.eval(
-                                                vals.iter()
-                                                    .map(|val| val[i].unpack_first())
-                                                    .collect::<HashSet<_>>()
-                                                    .into_iter(),
-                                                &temp_storage,
-                                            )
-                                        } else {
-                                            agg.func.eval(
-                                                vals.iter().map(|val| val[i].unpack_first()),
-                                                &temp_storage,
-                                            )
-                                        }
-                                    }),
-                                ));
-                                (row, 1)
-                            }
-                        })
-                        .collect();
-
+                //There are two cases when the `Reduce` gets boiled down to a
+                // 1) There are no aggregations, but the group key is a constant.
+                if aggregates.is_empty() && group_key.iter().all(|gk| gk.is_literal_ok()) {
+                    let row = repr::Row::pack(
+                        group_key.iter().map(|gk| gk.as_literal().unwrap().unwrap()),
+                    );
                     *relation = MirRelationExpr::Constant {
-                        rows: new_rows,
-                        typ: relation.typ(),
+                        rows: vec![(row, 1)],
+                        typ: relation_type,
                     };
+                } else {
+                    // 2) The input is a constant.
+                    for aggregate in aggregates.iter_mut() {
+                        aggregate.expr.reduce(&input.typ());
+                    }
+                    if let MirRelationExpr::Constant { rows, .. } = &**input {
+                        // Build a map from `group_key` to `Vec<Vec<an, ..., a1>>)`,
+                        // where `an` is the input to the nth aggregate function in
+                        // `aggregates`.
+                        let mut groups = BTreeMap::new();
+                        let temp_storage2 = RowArena::new();
+                        let mut row_packer = repr::RowPacker::new();
+                        for (row, diff) in rows {
+                            // We currently maintain the invariant that any negative
+                            // multiplicities will be consolidated away before they
+                            // arrive at a reduce.
+                            assert!(
+                                *diff > 0,
+                                "constant folding encountered reduce on collection \
+                             with non-positive multiplicities"
+                            );
+                            let datums = row.unpack();
+                            let temp_storage = RowArena::new();
+                            let key = group_key
+                                .iter()
+                                .map(|e| e.eval(&datums, &temp_storage2))
+                                .collect::<Result<Vec<_>, _>>()?;
+                            let val = aggregates
+                                .iter()
+                                .map(|agg| {
+                                    Ok::<_, TransformError>(
+                                        row_packer
+                                            .pack(&[agg.expr.eval(&datums, &temp_storage)?]),
+                                    )
+                                })
+                                .collect::<Result<Vec<_>, _>>()?;
+                            let entry = groups.entry(key).or_insert_with(Vec::new);
+                            for _ in 0..*diff {
+                                entry.push(val.clone());
+                            }
+                        }
+
+                        // For each group, apply the aggregate function to the rows
+                        // in the group. The output is
+                        // `Vec<Vec<k1, ..., kn, r1, ..., rn>>`
+                        // where kn is the nth column of the key and rn is the
+                        // result of the nth aggregate function for that group.
+                        let new_rows = groups
+                            .into_iter()
+                            .map({
+                                let mut row_packer = repr::RowPacker::new();
+                                move |(key, vals)| {
+                                    let temp_storage = RowArena::new();
+                                    let row = row_packer.pack(key.into_iter().chain(
+                                        aggregates.iter().enumerate().map(|(i, agg)| {
+                                            if agg.distinct {
+                                                agg.func.eval(
+                                                    vals.iter()
+                                                        .map(|val| val[i].unpack_first())
+                                                        .collect::<HashSet<_>>()
+                                                        .into_iter(),
+                                                    &temp_storage,
+                                                )
+                                            } else {
+                                                agg.func.eval(
+                                                    vals.iter().map(|val| val[i].unpack_first()),
+                                                    &temp_storage,
+                                                )
+                                            }
+                                        }),
+                                    ));
+                                    (row, 1)
+                                }
+                            })
+                            .collect();
+
+                        *relation = MirRelationExpr::Constant {
+                            rows: new_rows,
+                            typ: relation_type,
+                        };
+                    }
                 }
             }
             MirRelationExpr::TopK { .. } => { /*too complicated*/ }
