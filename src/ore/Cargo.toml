@@ -2,26 +2,27 @@
 name = "ore"
 description = "Internal utility libraries for Materialize."
 version = "0.0.0"
+license = "Apache-2.0"
 edition = "2018"
 publish = false
-license = "Apache-2.0"
 
 [dependencies]
-async-trait = "0.1.48"
+async-trait = "0.1.50"
 bytes = "1.0.1"
 fallible-iterator = "0.2.0"
-futures = "0.3.13"
+futures = "0.3.15"
 lazy_static = "1.4.0"
-libc = "0.2.92"
+libc = "0.2.94"
 log = "0.4.13"
-openssl = { version = "0.10.33", features = ["vendored"] }
+openssl = { version = "0.10.34", features = ["vendored"] }
 phf_shared = "0.8.0"
 smallvec = "1.5.0"
 structopt = "0.3.21"
-tokio = { version = "1.4.0", features = ["io-util", "net", "rt-multi-thread", "time"] }
+timely = { git = "https://github.com/TimelyDataflow/timely-dataflow", default-features = false, features = ["bincode"] }
+tokio = { version = "1.6.0", features = ["io-util", "net", "rt-multi-thread", "time"] }
 tokio-openssl = "0.6.1"
-tracing-subscriber = { version = "0.2.17", default-features = false, features = ["env-filter", "fmt"] }
+tracing-subscriber = { version = "0.2.18", default-features = false, features = ["env-filter", "fmt"] }
 
 [dev-dependencies]
-crossbeam-utils = "0.8.3"
-tokio = { version = "1.4.0", features = ["macros"] }
+crossbeam-utils = "0.8.4"
+tokio = { version = "1.6.0", features = ["macros"] }
